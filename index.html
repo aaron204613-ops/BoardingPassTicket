@@ -1,336 +1,240 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-   <meta charset="UTF-8">
-   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   <title>登机牌生成器 (Portable)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登机牌生成器</title>
+    
+    <!-- 1. 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. 引入 React 全家桶 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 3. 引入 html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-   <!-- 1. 引入 Tailwind CSS (样式) -->
-   <script src="https://cdn.tailwindcss.com"></script>
-
-   <!-- 2. 引入 React 和 ReactDOM (核心框架) -->
-   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-   <!-- 3. 引入 Babel (让浏览器能看懂 React 代码) -->
-   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-   <!-- 4. 引入 html2canvas (截图工具) -->
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-
-   <style>
-       /* 简单的加载动画 */
-       #loading {
-           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-           background: #f8fafc; display: flex; justify-content: center; align-items: center;
-           font-family: sans-serif; color: #64748b; z-index: 9999;
-       }
-   </style>
+    <style>
+        #loading {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #f8fafc; display: flex; justify-content: center; align-items: center;
+            font-family: sans-serif; color: #64748b; z-index: 9999;
+        }
+    </style>
 </head>
 <body>
 
+    <div id="loading">正在加载资源...</div>
+    <div id="root"></div>
 
-   <!-- 加载提示 -->
-   <div id="loading">正在加载生成器... (Loading...)</div>
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
 
-   <!-- React 应用挂载点 -->
-   <div id="root"></div>
+        // --- 图标组件 ---
+        const PlaneIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className={className}>
+                 <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+            </svg>
+        );
 
+        const QrCodeIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>
+            </svg>
+        );
 
-   <!-- React 应用程序代码 -->
-   <script type="text/babel">
-       const { useState, useRef, useEffect } = React;
+        // --- 主程序 ---
+        function BoardingPassApp() {
+            const [passData, setPassData] = useState({
+                name: 'ZHANG/SAN',
+                boardingTime: '09:30',
+                gate: 'A12',
+                flight: 'CA1234',
+                departure: 'BEIJING',
+                destination: 'SHANGHAI',
+                date: 'DEC 25',
+                seat: '08A',
+                class: 'ECONOMY',
+            });
 
+            const cardRef = useRef(null);
 
-       // --- 图标组件 (Inline SVG) ---
-       // 修复：换回了正确的飞机图标，使用实心填充风格
-       const PlaneIcon = ({ className }) => (
-           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className={className}>
-                <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-           </svg>
-       );
+            useEffect(() => {
+                const loader = document.getElementById('loading');
+                if (loader) loader.style.display = 'none';
+            }, []);
 
+            const handleChange = (e) => {
+                const { name, value } = e.target;
+                setPassData(prev => ({ ...prev, [name]: value }));
+            };
 
-       const QrCodeIcon = ({ className }) => (
-           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-               <rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>
-           </svg>
-       );
+            // --- 关键修复：截图逻辑 ---
+            const handleDownload = () => {
+                if (!cardRef.current) return;
 
+                // 1. 简单的配置，让 html2canvas 自动检测元素位置
+                // 移除了 x, y, width, height, scrollY 的强制设置
+                window.html2canvas(cardRef.current, {
+                    scale: 3, // 保持高清
+                    backgroundColor: null, // 透明背景
+                    useCORS: true, // 允许跨域图片(如果有)
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `BoardingPass_${passData.flight}_${passData.name}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                });
+            };
 
-       // --- 主应用程序 ---
-       function BoardingPassApp() {
-           const [passData, setPassData] = useState({
-               name: 'ZHANG/SAN',
-               boardingTime: '09:30',
-               gate: 'A12',
-               flight: 'CA1234',
-               departure: 'BEIJING',
-               destination: 'SHANGHAI',
-               date: 'DEC 25',
-               seat: '08A',
-               class: 'ECONOMY',
-           });
+            return (
+                <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans flex flex-col items-center">
+                    
+                    {/* 控制面板 */}
+                    <div className="w-full max-w-6xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
+                        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <span className="w-1 h-6 bg-red-600 rounded-full"></span>
+                            机票信息录入 / Passenger Info
+                        </h2>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <InputGroup label="姓名 / Name" name="name" value={passData.name} onChange={handleChange} />
+                            <InputGroup label="航班 / Flight" name="flight" value={passData.flight} onChange={handleChange} />
+                            <InputGroup label="日期 / Date" name="date" value={passData.date} onChange={handleChange} />
+                            <InputGroup label="登机时间 / Time" name="boardingTime" value={passData.boardingTime} onChange={handleChange} type="time" />
+                            <InputGroup label="始发地 / From" name="departure" value={passData.departure} onChange={handleChange} />
+                            <InputGroup label="目的地 / To" name="destination" value={passData.destination} onChange={handleChange} />
+                            <InputGroup label="登机口 / Gate" name="gate" value={passData.gate} onChange={handleChange} />
+                            <InputGroup label="座位 / Seat" name="seat" value={passData.seat} onChange={handleChange} />
+                        </div>
 
+                        <button onClick={handleDownload} className="mt-6 w-full md:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg hover:shadow-red-200 active:scale-95 flex items-center justify-center gap-2">
+                            <span>下载机票 (GitHub 修复版)</span>
+                        </button>
+                    </div>
 
-           const cardRef = useRef(null);
+                    {/* 预览区域 */}
+                    <div className="w-full overflow-x-auto pb-12 flex justify-center">
+                        <div ref={cardRef} className="flex flex-row bg-white rounded-3xl overflow-hidden shadow-2xl relative shrink-0" style={{ width: '1000px', height: '360px' }}>
+                            
+                            {/* 左侧主联 */}
+                            <div className="flex-[7] p-0 relative flex flex-col">
+                                <div className="bg-red-600 h-16 flex items-center px-8 justify-between text-white">
+                                    <div className="flex items-center gap-3">
+                                        <PlaneIcon className="w-8 h-8 rotate-45" />
+                                        <span className="font-bold tracking-[0.2em] text-xl">AIRLINE</span>
+                                    </div>
+                                    <span className="font-mono font-medium opacity-90 tracking-widest">BOARDING PASS 登机牌</span>
+                                </div>
 
+                                <div className="flex-1 p-8 grid grid-cols-3 gap-8 relative bg-white">
+                                    <div className="col-span-2 flex flex-col justify-between relative z-10">
+                                        <div>
+                                            <Label text="PASSENGER NAME / 旅客姓名" />
+                                            <div className="text-3xl font-bold text-slate-800 tracking-wide mt-1 whitespace-nowrap">{passData.name}</div>
+                                        </div>
+                                        <div className="flex items-end gap-6 mt-6">
+                                            <div className="min-w-0 flex-1">
+                                                <Label text="FROM / 始发地" />
+                                                <div className="text-2xl font-bold text-slate-700 mt-1 whitespace-nowrap">{passData.departure}</div>
+                                            </div>
+                                            <div className="pb-2 text-slate-300 shrink-0"><PlaneIcon className="w-6 h-6 rotate-90" /></div>
+                                            <div className="min-w-0 flex-1">
+                                                <Label text="TO / 目的地" />
+                                                <div className="text-2xl font-bold text-slate-700 mt-1 whitespace-nowrap">{passData.destination}</div>
+                                            </div>
+                                        </div>
+                                    </div>
 
-           // 移除加载动画
-           useEffect(() => {
-               const loader = document.getElementById('loading');
-               if (loader) loader.style.display = 'none';
-           }, []);
+                                    <div className="flex flex-col justify-between relative z-10">
+                                        <div className="grid grid-cols-2 gap-y-4 gap-x-4">
+                                            <div><Label text="FLIGHT / 航班" /><div className="text-base font-bold text-slate-800 leading-snug whitespace-nowrap">{passData.flight}</div></div>
+                                            <div><Label text="DATE / 日期" /><div className="text-base font-bold text-slate-800 leading-snug whitespace-nowrap">{passData.date}</div></div>
+                                            <div><Label text="GATE / 登机口" /><div className="text-base font-black text-red-600 leading-snug whitespace-nowrap">{passData.gate}</div></div>
+                                            <div><Label text="SEAT / 座位" /><div className="text-base font-black text-red-600 leading-snug whitespace-nowrap">{passData.seat}</div></div>
+                                        </div>
+                                        <div className="mt-2 flex flex-col items-center">
+                                            <Label text="BOARDING TIME / 登机时间" />
+                                            <div className="min-w-[120px] text-2xl font-black text-slate-800 border-2 border-slate-800 px-4 py-1 mt-1 rounded text-center">{passData.boardingTime}</div>
+                                        </div>
+                                    </div>
+                                </div>
 
+                                <div className="bg-slate-50 h-10 border-t border-slate-100 flex items-center px-8 justify-between">
+                                    <span className="text-xs text-slate-400 font-mono">ETKT 781-2342352352</span>
+                                    <span className="text-xs text-slate-400 font-mono uppercase">Class: {passData.class}</span>
+                                </div>
+                            </div>
 
-           const handleChange = (e) => {
-               const { name, value } = e.target;
-               setPassData(prev => ({
-                   ...prev,
-                   [name]: value
-               }));
-           };
+                            {/* 分割线 */}
+                            <div className="relative w-0 flex flex-col items-center justify-center">
+                                <div className="absolute top-0 bottom-0 border-l-2 border-dashed border-slate-300 left-[-1px] z-20"></div>
+                                <div className="absolute -top-3 w-6 h-6 bg-slate-100 rounded-full z-30 left-[-12px]"></div>
+                                <div className="absolute -bottom-3 w-6 h-6 bg-slate-100 rounded-full z-30 left-[-12px]"></div>
+                            </div>
 
+                            {/* 右侧副联 */}
+                            <div className="flex-[3] bg-slate-50 p-5 flex flex-col relative">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="flex items-center gap-2 opacity-80 mt-1">
+                                        <PlaneIcon className="w-5 h-5 text-red-600 rotate-45" />
+                                        <span className="font-bold text-sm tracking-wider text-slate-600">AIRLINE</span>
+                                    </div>
+                                    <QrCodeIcon className="w-12 h-12 text-slate-800" />
+                                </div>
 
-           const handleDownload = () => {
-               if (!cardRef.current) return;
+                                <div className="space-y-2 flex-1">
+                                    <StubRow label="NAME" value={passData.name} />
+                                    <div className="flex justify-between gap-2">
+                                        <StubRow label="FLIGHT" value={passData.flight} />
+                                        <StubRow label="DATE" value={passData.date} />
+                                    </div>
+                                    <div className="flex justify-between gap-2">
+                                        <StubRow label="FROM" value={passData.departure} />
+                                        <StubRow label="TO" value={passData.destination} />
+                                    </div>
+                                    
+                                    <div className="mt-3 mb-2 p-3 bg-white rounded-xl border border-slate-200 flex justify-between items-center shadow-md z-10">
+                                        <div className="min-w-0">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">Seat</div>
+                                            <div className="text-xl font-black text-red-600 whitespace-nowrap">{passData.seat}</div>
+                                        </div>
+                                        <div className="min-w-0 text-right">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">Gate</div>
+                                            <div className="text-xl font-black text-slate-800 whitespace-nowrap">{passData.gate}</div>
+                                        </div>
+                                    </div>
+                                </div>
 
+                                <div className="flex flex-col items-center justify-center pt-1 pb-1">
+                                    <span className="text-[10px] text-slate-400 font-mono">ETKT 781-2342352352</span>
+                                </div>
+                            </div>
 
-               const elementHeight = cardRef.current.scrollHeight;
-               const elementWidth = cardRef.current.scrollWidth;
+                        </div>
+                    </div>
+                </div>
+            );
+        }
 
+        const InputGroup = ({ label, name, value, onChange, type = "text" }) => (
+            <div className="flex flex-col">
+                <label className="text-xs font-semibold text-slate-500 mb-1.5">{label}</label>
+                <input type={type} name={name} value={value} onChange={onChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-medium text-slate-700 uppercase text-sm" />
+            </div>
+        );
+        const Label = ({ text }) => <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{text}</div>;
+        const StubRow = ({ label, value }) => (
+            <div className="flex flex-col min-w-0">
+                <span className="text-[9px] font-bold text-slate-400 uppercase">{label}</span>
+                <span className="text-xs font-bold text-slate-800 whitespace-nowrap">{value}</span>
+            </div>
+        );
 
-               window.html2canvas(cardRef.current, {
-                   scale: 3,
-                   backgroundColor: null,
-                   useCORS: true,
-                   width: elementWidth,
-                   height: elementHeight,
-                   windowWidth: elementWidth,
-                   windowHeight: elementHeight,
-                   scrollY: 0,
-                   x: 0,
-                   y: 0
-               }).then(canvas => {
-                   const link = document.createElement('a');
-                   link.download = `BoardingPass_${passData.flight}_${passData.name}.png`;
-                   link.href = canvas.toDataURL('image/png');
-                   link.click();
-               });
-           };
-
-
-           return (
-               <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans flex flex-col items-center">
-
-               {/* 顶部控制区 */}
-               <div className="w-full max-w-6xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
-                   <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                   <span className="w-1 h-6 bg-red-600 rounded-full"></span>
-                   机票信息录入 / Passenger Info
-                   </h2>
-
-                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                       <InputGroup label="姓名 / Name" name="name" value={passData.name} onChange={handleChange} />
-                       <InputGroup label="航班 / Flight" name="flight" value={passData.flight} onChange={handleChange} />
-                       <InputGroup label="日期 / Date (如: DEC 25)" name="date" value={passData.date} onChange={handleChange} />
-                       <InputGroup label="登机时间 / Time" name="boardingTime" value={passData.boardingTime} onChange={handleChange} type="time" />
-                       <InputGroup label="始发地 / From" name="departure" value={passData.departure} onChange={handleChange} />
-                       <InputGroup label="目的地 / To" name="destination" value={passData.destination} onChange={handleChange} />
-                       <InputGroup label="登机口 / Gate" name="gate" value={passData.gate} onChange={handleChange} />
-                       <InputGroup label="座位 / Seat" name="seat" value={passData.seat} onChange={handleChange} />
-                   </div>
-
-
-                   <button
-                   onClick={handleDownload}
-                   className="mt-6 w-full md:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg hover:shadow-red-200 active:scale-95 flex items-center justify-center gap-2"
-                   >
-                   <span>下载横向机票 PNG</span>
-                   <span className="text-xs opacity-80">(Download Landscape Pass)</span>
-                   </button>
-               </div>
-
-
-               {/* 预览区域：横向滚动容器 */}
-               <div className="w-full overflow-x-auto pb-12 flex justify-center">
-
-                   {/* The Horizontal Boarding Pass */}
-                   <div
-                   ref={cardRef}
-                   className="flex flex-row bg-white rounded-3xl overflow-hidden shadow-2xl relative shrink-0"
-                   style={{ width: '1000px', height: '360px' }}
-                   >
-                   {/* 左侧：主联 (Main Ticket) ~70% */}
-                   <div className="flex-[7] p-0 relative flex flex-col">
-                       {/* Header */}
-                       <div className="bg-red-600 h-16 flex items-center px-8 justify-between text-white">
-                       <div className="flex items-center gap-3">
-                           {/* 飞机图标在这里，现在是正确的了 */}
-                           <PlaneIcon className="w-8 h-8 rotate-45" />
-                           <span className="font-bold tracking-[0.2em] text-xl">AIRLINE</span>
-                       </div>
-                       <span className="font-mono font-medium opacity-90 tracking-widest">BOARDING PASS 登机牌</span>
-                       </div>
-
-
-                       {/* Content Body */}
-                       <div className="flex-1 p-8 grid grid-cols-3 gap-8 relative bg-white">
-                       {/* Column 1: Name & Route */}
-                       <div className="col-span-2 flex flex-col justify-between relative z-10">
-                           <div>
-                           <Label text="PASSENGER NAME / 旅客姓名" />
-                           <div className="text-3xl font-bold text-slate-800 tracking-wide mt-1 whitespace-nowrap">{passData.name}</div>
-                           </div>
-
-                           <div className="flex items-end gap-6 mt-6">
-                               <div className="min-w-0 flex-1">
-                               <Label text="FROM / 始发地" />
-                               <div className="text-2xl font-bold text-slate-700 mt-1 whitespace-nowrap">{passData.departure}</div>
-                               </div>
-                               <div className="pb-2 text-slate-300 shrink-0">
-                               <PlaneIcon className="w-6 h-6 rotate-90" />
-                               </div>
-                               <div className="min-w-0 flex-1">
-                               <Label text="TO / 目的地" />
-                               <div className="text-2xl font-bold text-slate-700 mt-1 whitespace-nowrap">{passData.destination}</div>
-                               </div>
-                           </div>
-                       </div>
-
-
-                       {/* Column 2: Flight Details */}
-                       <div className="flex flex-col justify-between relative z-10">
-                           <div className="grid grid-cols-2 gap-y-4 gap-x-4">
-                               <div>
-                               <Label text="FLIGHT / 航班" />
-                               <div className="text-base font-bold text-slate-800 leading-snug whitespace-nowrap">{passData.flight}</div>
-                               </div>
-                               <div>
-                               <Label text="DATE / 日期" />
-                               <div className="text-base font-bold text-slate-800 leading-snug whitespace-nowrap">{passData.date}</div>
-                               </div>
-                               <div>
-                               <Label text="GATE / 登机口" />
-                               <div className="text-base font-black text-red-600 leading-snug whitespace-nowrap">{passData.gate}</div>
-                               </div>
-                               <div>
-                               <Label text="SEAT / 座位" />
-                               <div className="text-base font-black text-red-600 leading-snug whitespace-nowrap">{passData.seat}</div>
-                               </div>
-                           </div>
-
-                           {/* 登机时间区域：修复对齐问题 */}
-                           <div className="mt-2 flex flex-col items-center">
-                               <Label text="BOARDING TIME / 登机时间" />
-                               <div className="min-w-[120px] text-2xl font-black text-slate-800 border-2 border-slate-800 px-4 py-1 mt-1 rounded text-center">
-                               {passData.boardingTime}
-                               </div>
-                           </div>
-                       </div>
-                       </div>
-
-
-                       {/* Bottom Bar */}
-                       <div className="bg-slate-50 h-10 border-t border-slate-100 flex items-center px-8 justify-between">
-                       <span className="text-xs text-slate-400 font-mono">ETKT 781-2342352352</span>
-                       <span className="text-xs text-slate-400 font-mono uppercase">Class: {passData.class}</span>
-                       </div>
-                   </div>
-
-
-                   {/* 撕票分割线 (Divider) */}
-                   <div className="relative w-0 flex flex-col items-center justify-center">
-                       <div className="absolute top-0 bottom-0 border-l-2 border-dashed border-slate-300 left-[-1px] z-20"></div>
-                       <div className="absolute -top-3 w-6 h-6 bg-slate-100 rounded-full z-30 left-[-12px]"></div>
-                       <div className="absolute -bottom-3 w-6 h-6 bg-slate-100 rounded-full z-30 left-[-12px]"></div>
-                   </div>
-
-
-                   {/* 右侧：副联 (Stub) */}
-                   <div className="flex-[3] bg-slate-50 p-5 flex flex-col relative">
-                       <div className="flex justify-between items-start mb-4">
-                           <div className="flex items-center gap-2 opacity-80 mt-1">
-                               <PlaneIcon className="w-5 h-5 text-red-600 rotate-45" />
-                               <span className="font-bold text-sm tracking-wider text-slate-600">AIRLINE</span>
-                           </div>
-                           <QrCodeIcon className="w-12 h-12 text-slate-800" />
-                       </div>
-
-
-                       <div className="space-y-2 flex-1">
-                           <StubRow label="NAME" value={passData.name} />
-                           <div className="flex justify-between gap-2">
-                           <StubRow label="FLIGHT" value={passData.flight} />
-                           <StubRow label="DATE" value={passData.date} />
-                           </div>
-                           <div className="flex justify-between gap-2">
-                           <StubRow label="FROM" value={passData.departure} />
-                           <StubRow label="TO" value={passData.destination} />
-                           </div>
-
-                           {/* 方框区域：独立卡片 */}
-                           <div className="mt-3 mb-2 p-3 bg-white rounded-xl border border-slate-200 flex justify-between items-center shadow-md z-10">
-                           <div className="min-w-0">
-                               <div className="text-[10px] font-bold text-slate-400 uppercase">Seat</div>
-                               <div className="text-xl font-black text-red-600 whitespace-nowrap">{passData.seat}</div>
-                           </div>
-                           <div className="min-w-0 text-right">
-                               <div className="text-[10px] font-bold text-slate-400 uppercase">Gate</div>
-                               <div className="text-xl font-black text-slate-800 whitespace-nowrap">{passData.gate}</div>
-                           </div>
-                           </div>
-                       </div>
-
-
-                       <div className="flex flex-col items-center justify-center pt-1 pb-1">
-                           <span className="text-[10px] text-slate-400 font-mono">ETKT 781-2342352352</span>
-                       </div>
-                   </div>
-
-
-                   </div>
-               </div>
-               </div>
-           );
-       }
-
-
-       // --- 辅助组件 ---
-       const InputGroup = ({ label, name, value, onChange, type = "text" }) => (
-           <div className="flex flex-col">
-               <label className="text-xs font-semibold text-slate-500 mb-1.5">{label}</label>
-               <input
-               type={type}
-               name={name}
-               value={value}
-               onChange={onChange}
-               className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-medium text-slate-700 uppercase text-sm"
-               />
-           </div>
-       );
-
-
-       const Label = ({ text }) => (
-           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{text}</div>
-       );
-
-
-       const StubRow = ({ label, value }) => (
-           <div className="flex flex-col min-w-0">
-               <span className="text-[9px] font-bold text-slate-400 uppercase">{label}</span>
-               <span className="text-xs font-bold text-slate-800 whitespace-nowrap">{value}</span>
-           </div>
-       );
-
-
-       // --- 渲染应用 ---
-       const root = ReactDOM.createRoot(document.getElementById('root'));
-       root.render(<BoardingPassApp />);
-   </script>
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<BoardingPassApp />);
+    </script>
 </body>
 </html>
-
-
-
